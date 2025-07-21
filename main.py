@@ -364,12 +364,9 @@ app.layout = html.Div([
                 # Brand Performance Chart
                 html.Div([
                     dcc.Graph(id='brand-performance-chart')
-                ], style={'width': '48%', 'display': 'inline-block'}),
+                ], style={'width': '100%', 'display': 'inline-block'}),
                 
-                # Campaign Timeline Chart
-                html.Div([
-                    dcc.Graph(id='campaign-timeline-chart')
-                ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '4%'})
+               
             ])
         ], className='section-container'),
 
@@ -1106,9 +1103,7 @@ def update_brand_performance_chart(_):
     )
     return fig
 
-# Callback for Campaign Timeline Chart
-@app.callback(Output('campaign-timeline-chart', 'figure'), [Input('campaign-timeline-chart', 'id')])
-def update_campaign_timeline_chart(_):
+
     # Create timeline data based on posts data
     posts_df = pd.read_csv('data/posts.csv')
     posts_df['date'] = pd.to_datetime(posts_df['date'])
