@@ -1,0 +1,36 @@
+post_id,influencer_id,video_title,date,impressions,impressions_ctr_percentage,views,watch_time_hours,average_view_duration_seconds,audience_retention_percentage,likes,comments,subscribers_gained,estimated_revenue_inr
+POST_HK002_01,HK002,My morning routine with bGreen #HealthKart #bGreen...,2024-10-13,271892,21.42,58226,739.1,160.0,58.4,3963,239,304,82380.9
+POST_HK002_02,HK002,Living my best life with MuscleBlaze #HealthKart #...,2024-11-26,305441,20.81,63577,469.0,149.0,54.2,4366,111,72,44891.17
+POST_HK002_03,HK002,Wellness Wednesday with bGreen #HealthKart #bGreen...,2024-12-29,216120,18.55,40087,488.32,146.0,51.1,1286,82,111,31032.42
+POST_HK002_04,HK002,Daily essentials: MuscleBlaze #HealthKart #MuscleB...,2024-11-21,379540,17.78,67501,378.3,114.0,46.5,3155,142,230,34285.05
+POST_HK002_05,HK002,Living my best life with MuscleBlaze #HealthKart #...,2024-11-28,247957,24.62,61053,779.32,188.0,68.1,3841,157,209,82248.42
+POST_HK003_01,HK003,Healthy living made easy with HK Vitals #HealthKar...,2024-10-14,566277,14.0,79266,398.67,293.0,76.0,2553,92,716,88797.0
+POST_HK003_02,HK003,Boost your immunity with Gritzo #HealthKart #Gritz...,2024-10-17,866404,18.39,159302,1939.1,66.0,77.8,14560,299,1464,309774.87
+POST_HK003_03,HK003,Boost your immunity with HK Vitals #HealthKart #HK...,2024-11-15,442202,27.97,123662,1042.58,243.0,79.7,10977,795,355,228197.93
+POST_HK003_04,HK003,Healthy living made easy with HK Vitals #HealthKar...,2024-12-25,1294844,14.38,186230,2131.28,280.0,70.2,6375,142,722,246943.36
+POST_HK003_05,HK003,My health transformation with bGreen #HealthKart #...,2024-11-14,213502,30.43,64968,348.87,242.0,76.2,3971,141,127,114714.69
+POST_HK005_01,HK005,Doctor recommends HK Vitals #HealthKart #HKVitals ...,2024-11-06,206694,30.26,62544,322.9,169.0,56.8,2789,81,370,95752.54
+POST_HK005_02,HK005,Clinical benefits of bGreen #HealthKart #bGreen #H...,2024-12-13,181898,19.21,34939,292.4,205.0,71.1,792,56,316,50691.51
+POST_HK005_03,HK005,Science behind bGreen #HealthKart #bGreen #Health ...,2024-10-22,150064,29.48,44240,571.87,237.0,79.8,6073,337,382,29889.61
+POST_HK005_04,HK005,Medical advice: Benefits of Gritzo #HealthKart #Gr...,2024-11-23,241482,22.86,55200,711.97,273.0,54.9,3037,234,221,94147.02
+POST_HK005_05,HK005,Doctor recommends Gritzo #HealthKart #Gritzo #Heal...,2024-11-29,297163,16.14,47969,490.57,255.0,52.8,1939,52,463,67118.43
+POST_HK009_01,HK009,Post-workout recovery with MuscleBlaze #HealthKart...,2024-11-12,586151,23.87,139924,1812.17,92.0,44.8,3380,96,901,123991.64
+POST_HK009_02,HK009,Building muscle mass with bGreen #HealthKart #bGre...,2024-12-20,184896,24.44,45197,336.47,86.0,44.5,1122,84,241,63953.51
+POST_HK009_03,HK009,Transform your body with bGreen #HealthKart #bGree...,2024-11-17,328157,25.55,83855,744.38,202.0,55.5,3995,123,729,68462.96
+POST_HK009_04,HK009,Pre-workout routine with HK Vitals #HealthKart #HK...,2024-11-06,431722,17.69,76376,1004.3,64.0,75.0,5072,295,119,138950.34
+POST_HK009_05,HK009,My daily supplement stack: bGreen #HealthKart #bGr...,2024-12-24,1036012,13.01,134820,1536.35,267.0,59.4,3117,244,703,92160.01
+POST_HK016_01,HK016,Daily wellness tips with Gritzo #HealthKart #Gritz...,2024-11-17,121302,22.43,27209,215.98,117.0,48.5,2625,182,80,44487.26
+POST_HK016_02,HK016,Daily wellness tips with Gritzo #HealthKart #Gritz...,2024-11-25,325347,19.69,64075,643.47,112.0,57.9,1665,113,624,85634.25
+POST_HK016_03,HK016,Healthy living made easy with bGreen #HealthKart #...,2024-12-26,303743,23.82,72363,962.63,300.0,66.9,4261,220,506,129190.28
+POST_HK016_04,HK016,Boost your immunity with bGreen #HealthKart #bGree...,2024-11-06,303532,25.79,78286,996.4,238.0,61.9,2477,183,429,78104.78
+POST_HK016_05,HK016,Healthy living made easy with HK Vitals #HealthKar...,2024-12-21,229590,13.07,30009,281.5,66.0,69.4,1872,53,280,31636.78
+POST_HK017_01,HK017,Transform your body with MuscleBlaze #HealthKart #...,2024-11-22,834735,19.29,160985,1025.82,81.0,56.9,18495,1124,320,260754.93
+POST_HK017_02,HK017,My daily supplement stack: HK Vitals #HealthKart #...,2024-11-11,984887,14.28,140618,1760.07,170.0,47.1,14741,364,428,200423.15
+POST_HK017_03,HK017,Pre-workout routine with MuscleBlaze #HealthKart #...,2024-11-13,788370,26.83,211510,1856.95,272.0,39.3,6592,236,1306,216191.59
+POST_HK017_04,HK017,Transform your body with MuscleBlaze #HealthKart #...,2024-12-28,506390,26.64,134901,953.2,135.0,65.6,7606,428,308,94752.64
+POST_HK017_05,HK017,My daily supplement stack: MuscleBlaze #HealthKart...,2024-10-13,764383,25.85,197587,1635.42,298.0,51.5,21890,1702,1414,238190.2
+POST_HK020_01,HK020,Boost your immunity with Gritzo #HealthKart #Gritz...,2024-12-11,230264,25.89,59619,622.47,276.0,49.8,1651,38,505,31274.29
+POST_HK020_02,HK020,Boost your immunity with bGreen #HealthKart #bGree...,2024-11-30,203476,16.93,34442,412.2,174.0,51.2,3009,70,147,30807.1
+POST_HK020_03,HK020,Healthy living made easy with HK Vitals #HealthKar...,2024-12-03,126624,15.02,19014,167.78,129.0,58.9,2102,55,178,26417.49
+POST_HK020_04,HK020,Daily wellness tips with HK Vitals #HealthKart #HK...,2024-11-02,441210,14.14,62387,447.5,103.0,79.9,6001,392,81,32307.7
+POST_HK020_05,HK020,Healthy living made easy with bGreen #HealthKart #...,2024-10-31,228549,15.43,35257,445.45,97.0,66.6,4431,91,243,56726.01
