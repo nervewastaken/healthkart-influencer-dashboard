@@ -1,6 +1,6 @@
 import dash
 from dash import dcc, html, dash_table
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -143,6 +143,7 @@ influencer_df = pd.read_csv('data/influencers.csv')
 instagram_df = pd.read_csv('data/instagram_insights_data.csv')
 youtube_df = pd.read_csv('data/youtube_analytics_data.csv')
 tracking_df = pd.read_csv('data/tracking_data.csv')
+tracking_data_df = tracking_df  # Alias for CAC analysis
 posts_df = pd.read_csv('data/posts.csv')
 
 # Load additional data files
@@ -532,6 +533,25 @@ app.layout = html.Div([
                                 'border': '1px solid #9b59b6',
                                 'color': 'white'
                             }),
+                     dcc.Tab(label='💸 CAC Analysis', value='cac-analysis',
+                            style={
+                                'padding': '15px 30px',
+                                'fontWeight': 'bold',
+                                'fontSize': '14px',
+                                'borderRadius': '5px 5px 0 0',
+                                'backgroundColor': '#f8f9fa',
+                                'border': '1px solid #dee2e6',
+                                'color': '#495057'
+                            },
+                            selected_style={
+                                'padding': '15px 30px',
+                                'fontWeight': 'bold',
+                                'fontSize': '14px',
+                                'borderRadius': '5px 5px 0 0',
+                                'backgroundColor': '#e67e22',
+                                'border': '1px solid #e67e22',
+                                'color': 'white'
+                            }),
                  ]),
         
         html.Div(id='advanced-content')
@@ -543,7 +563,92 @@ app.layout = html.Div([
         'borderRadius': '15px',
         'boxShadow': '0 4px 20px rgba(0,0,0,0.1)',
         'border': '1px solid #e9ecef'
-    })
+    }),
+
+    # Data Upload Section
+    html.Div([
+        html.H2("📁 Data Management", className='section-title',
+                style={'fontSize': '2.5em', 'fontWeight': '300'}),
+        
+        html.Div([
+            # Instagram Upload
+            html.Div([
+                html.H4("📸 Upload Instagram Data", style={'color': '#E4405F', 'marginBottom': '15px'}),
+                dcc.Upload(
+                    id='upload-instagram',
+                    children=html.Div([
+                        'Drag and Drop or ',
+                        html.A('Select Instagram CSV File')
+                    ]),
+                    style={
+                        'width': '100%',
+                        'height': '80px',
+                        'lineHeight': '80px',
+                        'borderWidth': '2px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '10px',
+                        'textAlign': 'center',
+                        'borderColor': '#E4405F',
+                        'backgroundColor': '#fef7f7'
+                    },
+                    multiple=False
+                ),
+                html.Div(id='instagram-upload-status', style={'marginTop': '10px'})
+            ], style={'width': '48%', 'display': 'inline-block'}),
+
+            # YouTube Upload  
+            html.Div([
+                html.H4("📺 Upload YouTube Data", style={'color': '#FF0000', 'marginBottom': '15px'}),
+                dcc.Upload(
+                    id='upload-youtube',
+                    children=html.Div([
+                        'Drag and Drop or ',
+                        html.A('Select YouTube CSV File')
+                    ]),
+                    style={
+                        'width': '100%',
+                        'height': '80px',
+                        'lineHeight': '80px',
+                        'borderWidth': '2px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '10px',
+                        'textAlign': 'center',
+                        'borderColor': '#FF0000',
+                        'backgroundColor': '#fff5f5'
+                    },
+                    multiple=False
+                ),
+                html.Div(id='youtube-upload-status', style={'marginTop': '10px'})
+            ], style={'width': '48%', 'display': 'inline-block', 'marginLeft': '4%'})
+        ], style={'marginBottom': '30px'}),
+
+        # Payouts Upload
+        html.Div([
+            html.H4("💰 Upload Payout Data", style={'color': '#27ae60', 'marginBottom': '15px', 'textAlign': 'center'}),
+            dcc.Upload(
+                id='upload-payouts',
+                children=html.Div([
+                    'Drag and Drop or ',
+                    html.A('Select Payout CSV File')
+                ]),
+                style={
+                    'width': '60%',
+                    'height': '80px',
+                    'lineHeight': '80px',
+                    'borderWidth': '2px',
+                    'borderStyle': 'dashed',
+                    'borderRadius': '10px',
+                    'textAlign': 'center',
+                    'borderColor': '#27ae60',
+                    'backgroundColor': '#d5f4e6',
+                    'margin': '0 auto'
+                },
+                multiple=False
+            ),
+            html.Div(id='payout-upload-status', style={'marginTop': '10px', 'textAlign': 'center'})
+        ])
+    ], className='section-container')
+
     ], className='dashboard-container')
 ])
 
@@ -728,12 +833,23 @@ def update_brand_performance_chart(_):
     }
     brand_df = pd.DataFrame(brands_data)
     
-    fig = px.bar(brand_df, x='Brand', y='Revenue', 
-                title='Brand Performance - Revenue by Brand',
-                color='ROAS',
-                color_continuous_scale='Viridis',
-                hover_data={'Campaigns': True, 'ROAS': ':.2f'})
-    fig.update_layout(title_x=0.5, height=350)
+    # Use go.Figure instead of px.bar to avoid template issues
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=brand_df['Brand'],
+        y=brand_df['Revenue'],
+        marker_color=['#3498db', '#e74c3c', '#27ae60', '#f39c12'],
+        hovertemplate='<b>%{x}</b><br>Revenue: ₹%{y:,.0f}<br>ROAS: %{customdata:.2f}<extra></extra>',
+        customdata=brand_df['ROAS']
+    ))
+    
+    fig.update_layout(
+        title='Brand Performance - Revenue by Brand',
+        title_x=0.5,
+        height=350,
+        xaxis_title='Brand',
+        yaxis_title='Revenue (₹)'
+    )
     return fig
 
 # Callback for Campaign Timeline Chart
@@ -1527,6 +1643,115 @@ def render_advanced_content(selected_tab):
             html.H4("Lifetime Lift Analysis", style={'textAlign': 'center'}),
             dcc.Graph(figure=fig)
         ])
+    
+    elif selected_tab == 'cac-analysis':
+        # CAC Analysis - prepare the data first with fallback
+        try:
+            if tracking_data_df.empty:
+                cost_orders = payout_df[['influencer_id', 'total_cost', 'orders']].copy()
+                cost_orders = cost_orders.merge(influencer_df[['influencer_id', 'platform']],
+                                                on='influencer_id', how='left')
+                cost_orders['unique_customers'] = cost_orders['orders']
+            else:
+                uniques = (tracking_data_df
+                           .groupby('influencer_id')['user_id']
+                           .nunique()
+                           .reset_index(name='unique_customers'))
+                cost_orders = payout_df.merge(uniques, on='influencer_id', how='left')
+                cost_orders = cost_orders.merge(influencer_df[['influencer_id', 'platform']],
+                                                on='influencer_id', how='left')
+                cost_orders['unique_customers'].fillna(cost_orders['orders'], inplace=True)
+
+            cost_orders['cac'] = cost_orders['total_cost'] / cost_orders['unique_customers'].replace(0, np.nan)
+
+            # Create overall metrics
+            total_cost = cost_orders['total_cost'].sum()
+            total_customers = cost_orders['unique_customers'].sum()
+            avg_cac = cost_orders['cac'].mean()
+
+            # Platform breakdown
+            by_platform = (cost_orders.groupby('platform')
+                           .agg(total_cost=('total_cost', 'sum'),
+                                customers=('unique_customers', 'sum'))
+                           .reset_index())
+            by_platform['cac'] = by_platform['total_cost'] / by_platform['customers']
+
+            # Influencer breakdown
+            by_influencer = cost_orders.merge(influencer_df[['influencer_id', 'name']], on='influencer_id')
+            by_influencer = by_influencer[['name', 'platform', 'total_cost', 'unique_customers', 'cac']].copy()
+
+            # Create KPI cards
+            card_style = {
+                'backgroundColor': '#f8f9fa',
+                'padding': '20px',
+                'borderRadius': '10px',
+                'textAlign': 'center',
+                'width': '30%',
+                'display': 'inline-block',
+                'margin': '1%'
+            }
+
+            kpi_cards = html.Div([
+                html.Div([
+                    html.H4("Avg CAC (Overall)", style={'color': '#2c3e50'}),
+                    html.H2(f"₹{avg_cac:,.2f}", style={'color': '#e67e22'})
+                ], style=card_style),
+                html.Div([
+                    html.H4("Total Customers", style={'color': '#2c3e50'}),
+                    html.H2(f"{int(total_customers):,}", style={'color': '#27ae60'})
+                ], style=card_style),
+                html.Div([
+                    html.H4("Total Spend", style={'color': '#2c3e50'}),
+                    html.H2(f"₹{total_cost:,.0f}", style={'color': '#c0392b'})
+                ], style=card_style)
+            ])
+
+            # Platform chart
+            fig_plat = px.bar(by_platform,
+                              x='platform', y='cac',
+                              color='platform',
+                              text=by_platform['cac'].round(0),
+                              title='Customer Acquisition Cost by Platform')
+            fig_plat.update_layout(yaxis_title='CAC (₹)', xaxis_title='Platform', height=400)
+
+            # Influencer table
+            inf_table = dash_table.DataTable(
+                columns=[
+                    {'name': 'Influencer', 'id': 'name'},
+                    {'name': 'Platform', 'id': 'platform'},
+                    {'name': 'Spend (₹)', 'id': 'total_cost', 'type': 'numeric',
+                     'format': {'specifier': ',.0f'}},
+                    {'name': 'Customers', 'id': 'unique_customers', 'type': 'numeric',
+                     'format': {'specifier': ',.0f'}},
+                    {'name': 'CAC (₹)', 'id': 'cac', 'type': 'numeric',
+                     'format': {'specifier': ',.0f'}}
+                ],
+                data=by_influencer.sort_values('cac').to_dict('records'),
+                style_cell={'textAlign': 'center', 'padding': '12px', 'fontFamily': 'Inter'},
+                style_header={'backgroundColor': '#e67e22', 'color': 'white', 'fontWeight': 'bold'},
+                page_size=10
+            )
+
+            return html.Div([
+                html.H4("💸 Customer Acquisition Cost Analysis", 
+                       style={'textAlign': 'center', 'color': '#e67e22', 'marginBottom': '30px', 'fontSize': '1.8em'}),
+                kpi_cards,
+                dcc.Graph(figure=fig_plat, style={'margin': '30px 0'}),
+                html.H4("Influencer-level CAC (sorted best to worst)",
+                        style={'textAlign': 'center', 'marginTop': '20px', 'color': '#2c3e50'}),
+                inf_table
+            ], style={
+                'backgroundColor': '#fdf6f0',
+                'padding': '30px',
+                'borderRadius': '15px',
+                'border': '1px solid #e67e22'
+            })
+
+        except Exception as e:
+            return html.Div([
+                html.H4("CAC Analysis", style={'textAlign': 'center'}),
+                html.P(f"Error loading CAC data: {str(e)}", style={'textAlign': 'center', 'color': '#e74c3c'})
+            ])
         
     else:
         return html.Div([
@@ -1534,6 +1759,148 @@ def render_advanced_content(selected_tab):
             html.P("Choose from the tabs above to view advanced analytics.", 
                    style={'textAlign': 'center', 'color': '#7f8c8d'})
         ])
+
+# ==================== UPLOAD CALLBACKS ====================
+@app.callback(
+    Output('instagram-upload-status', 'children'),
+    Input('upload-instagram', 'contents'),
+    State('upload-instagram', 'filename')
+)
+def upload_instagram_data(contents, filename):
+    if contents is not None:
+        try:
+            import base64
+            import io
+            
+            # Decode the uploaded file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            df_new = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+            # Validate required columns for Instagram data
+            required_cols = ['influencer_id', 'likes', 'comments', 'saves', 'reach', 'impressions']
+            missing_cols = [col for col in required_cols if col not in df_new.columns]
+            if missing_cols:
+                return html.Div(f"❌ Missing required columns: {missing_cols}", style={'color': '#e74c3c'})
+            
+            # Check if influencers exist and are Instagram influencers
+            existing_instagram_influencers = set(influencer_df[influencer_df['platform'] == 'Instagram']['influencer_id'])
+            new_influencers = set(df_new['influencer_id'])
+            invalid_influencers = new_influencers - existing_instagram_influencers
+            
+            if invalid_influencers:
+                return html.Div(f"❌ Invalid influencer IDs for Instagram: {list(invalid_influencers)}", style={'color': '#e74c3c'})
+            
+            # Append to existing Instagram data
+            existing_df = pd.read_csv('data/instagram_insights_data.csv')
+            combined_df = pd.concat([existing_df, df_new], ignore_index=True)
+            combined_df.to_csv('data/instagram_insights_data.csv', index=False)
+            
+            return html.Div(f"✅ Successfully uploaded {len(df_new)} Instagram records!", style={'color': '#27ae60'})
+            
+        except Exception as e:
+            return html.Div(f"❌ Error: {str(e)}", style={'color': '#e74c3c'})
+    
+    return ""
+
+@app.callback(
+    Output('youtube-upload-status', 'children'),
+    Input('upload-youtube', 'contents'),
+    State('upload-youtube', 'filename')
+)
+def upload_youtube_data(contents, filename):
+    if contents is not None:
+        try:
+            import base64
+            import io
+            
+            # Decode the uploaded file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            df_new = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+            # Validate required columns for YouTube data
+            required_cols = ['influencer_id', 'impressions_ctr_percentage', 'audience_retention_percentage', 'subscribers_gained', 'watch_time_hours']
+            missing_cols = [col for col in required_cols if col not in df_new.columns]
+            if missing_cols:
+                return html.Div(f"❌ Missing required columns: {missing_cols}", style={'color': '#e74c3c'})
+            
+            # Check if influencers exist and are YouTube influencers
+            existing_youtube_influencers = set(influencer_df[influencer_df['platform'] == 'YouTube']['influencer_id'])
+            new_influencers = set(df_new['influencer_id'])
+            invalid_influencers = new_influencers - existing_youtube_influencers
+            
+            if invalid_influencers:
+                return html.Div(f"❌ Invalid influencer IDs for YouTube: {list(invalid_influencers)}", style={'color': '#e74c3c'})
+            
+            # Append to existing YouTube data
+            existing_df = pd.read_csv('data/youtube_analytics_data.csv')
+            combined_df = pd.concat([existing_df, df_new], ignore_index=True)
+            combined_df.to_csv('data/youtube_analytics_data.csv', index=False)
+            
+            return html.Div(f"✅ Successfully uploaded {len(df_new)} YouTube records!", style={'color': '#27ae60'})
+            
+        except Exception as e:
+            return html.Div(f"❌ Error: {str(e)}", style={'color': '#e74c3c'})
+    
+    return ""
+
+@app.callback(
+    Output('payout-upload-status', 'children'),
+    Input('upload-payouts', 'contents'),
+    State('upload-payouts', 'filename')
+)
+def upload_payout_data(contents, filename):
+    if contents is not None:
+        try:
+            import base64
+            import io
+            
+            # Decode the uploaded file
+            content_type, content_string = contents.split(',')
+            decoded = base64.b64decode(content_string)
+            df_new = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            
+            # Validate required columns for Payouts
+            required_cols = ['influencer_id', 'orders', 'total_revenue', 'total_cost']
+            missing_cols = [col for col in required_cols if col not in df_new.columns]
+            if missing_cols:
+                return html.Div(f"❌ Missing required columns: {missing_cols}", style={'color': '#e74c3c'})
+            
+            # Check if influencers exist
+            existing_influencers = set(influencer_df['influencer_id'])
+            new_influencers = set(df_new['influencer_id'])
+            invalid_influencers = new_influencers - existing_influencers
+            
+            if invalid_influencers:
+                return html.Div(f"❌ Invalid influencer IDs: {list(invalid_influencers)}", style={'color': '#e74c3c'})
+            
+            # For payouts, we'll add the new data to existing influencer totals
+            existing_df = pd.read_csv('data/payouts.csv')
+            
+            # Aggregate new data by influencer
+            for _, new_row in df_new.iterrows():
+                influencer_id = new_row['influencer_id']
+                existing_row_idx = existing_df[existing_df['influencer_id'] == influencer_id].index
+                
+                if len(existing_row_idx) > 0:
+                    # Add to existing influencer
+                    idx = existing_row_idx[0]
+                    existing_df.loc[idx, 'orders'] += new_row['orders']
+                    existing_df.loc[idx, 'total_revenue'] += new_row['total_revenue']
+                    existing_df.loc[idx, 'total_cost'] += new_row['total_cost']
+                else:
+                    # New influencer entry
+                    existing_df = pd.concat([existing_df, new_row.to_frame().T], ignore_index=True)
+            
+            existing_df.to_csv('data/payouts.csv', index=False)
+            
+            return html.Div(f"✅ Successfully uploaded {len(df_new)} payout records!", style={'color': '#27ae60'})
+            
+        except Exception as e:
+            return html.Div(f"❌ Error: {str(e)}", style={'color': '#e74c3c'})
+    
+    return ""
 
 
 if __name__ == '__main__':
