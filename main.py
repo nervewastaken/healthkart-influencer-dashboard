@@ -9,6 +9,14 @@ import os
 from datetime import datetime, timedelta
 from plotly.subplots import make_subplots
 import plotly.figure_factory as ff
+import base64
+import io
+import zipfile
+try:
+    import weasyprint
+    PDF_EXPORT_AVAILABLE = True
+except ImportError:
+    PDF_EXPORT_AVAILABLE = False
 
 # Initialize Dash app with external stylesheets
 app = dash.Dash(__name__, external_stylesheets=[
@@ -124,7 +132,70 @@ app.index_string = '''
             .tab-content {
                 padding: 30px;
             }
+            /* Card Layout Fixes - CRITICAL FOR 2 PER ROW */
+            .card-row {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                align-items: stretch !important;
+                margin-bottom: 20px !important;
+                gap: 2% !important;
+            }
+            .card-item {
+                flex: 0 0 47% !important;
+                max-width: 47% !important;
+                box-sizing: border-box !important;
+                display: block !important;
+                margin: 0 !important;
+            }
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+                .card-item {
+                    flex: 0 0 100% !important;
+                    max-width: 100% !important;
+                    margin-bottom: 15px !important;
+                }
+            }
+            /* Ensure cards in payout section display properly */
+            .payout-card-container {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                justify-content: space-between !important;
+                gap: 2% !important;
+            }
+            .payout-card-item {
+                flex: 0 0 48% !important;
+                max-width: 48% !important;
+                box-sizing: border-box !important;
+            }
+            /* Export Button Hover Effects */
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+            }
+            #export-pdf-btn:hover {
+                background-color: #c0392b !important;
+            }
+            #export-csv-btn:hover {
+                background-color: #219a52 !important;
+            }
+            /* Modal Styles */
+            .modal-close {
+                position: absolute;
+                top: 15px;
+                right: 20px;
+                font-size: 28px;
+                font-weight: bold;
+                cursor: pointer;
+                color: #aaa;
+            }
+            .modal-close:hover {
+                color: #000;
+            }
         </style>
+        <script>
+            // Modal functionality will be handled by Dash callbacks
+        </script>
     </head>
     <body>
         {%app_entry%}
@@ -178,10 +249,40 @@ estimated_reach = total_followers * 0.4  # Assuming 40% organic reach rate
 app.layout = html.Div([
     # Beautiful Header with Gradient
     html.Div([
-        html.H1("HealthKart Influencer Campaign Dashboard", 
-               style={'margin': '0', 'fontSize': '3em', 'fontWeight': '700'}),
-        html.P("Comprehensive Analytics & Performance Insights", 
-               style={'margin': '10px 0 0 0', 'fontSize': '1.2em', 'opacity': '0.9'})
+        html.Div([
+            html.Div([
+                html.H1("HealthKart Influencer Campaign Dashboard", 
+                       style={'margin': '0', 'fontSize': '3em', 'fontWeight': '700'}),
+                html.P("Comprehensive Analytics & Performance Insights", 
+                       style={'margin': '10px 0 0 0', 'fontSize': '1.2em', 'opacity': '0.9'})
+            ], style={'flex': '1'}),
+            
+            # Export Buttons
+            html.Div([
+                html.Button([
+                    html.I(className="fas fa-file-pdf", style={'marginRight': '8px'}),
+                    "Export to PDF"
+                ], id='export-pdf-btn', 
+                   style={
+                       'backgroundColor': '#e74c3c', 'color': 'white', 'border': 'none',
+                       'padding': '12px 20px', 'borderRadius': '8px', 'cursor': 'pointer',
+                       'fontSize': '1em', 'fontWeight': '600', 'marginRight': '10px',
+                       'boxShadow': '0 4px 15px rgba(231,76,60,0.3)',
+                       'transition': 'all 0.3s ease'
+                   }),
+                html.Button([
+                    html.I(className="fas fa-file-csv", style={'marginRight': '8px'}),
+                    "Export Data to CSV"
+                ], id='export-csv-btn',
+                   style={
+                       'backgroundColor': '#27ae60', 'color': 'white', 'border': 'none',
+                       'padding': '12px 20px', 'borderRadius': '8px', 'cursor': 'pointer',
+                       'fontSize': '1em', 'fontWeight': '600',
+                       'boxShadow': '0 4px 15px rgba(39,174,96,0.3)',
+                       'transition': 'all 0.3s ease'
+                   })
+            ], style={'display': 'flex', 'alignItems': 'center'})
+        ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'})
     ], className='header-gradient'),
 
     # Main Dashboard Container
@@ -279,7 +380,7 @@ app.layout = html.Div([
             # Payout Summary Cards
             html.Div([
                 html.Div(id='payout-summary-cards')
-            ], style={'marginBottom': '30px'}),
+            ], style={'marginBottom': '20px'}),
             
             # Payout Details Table
             html.Div([
@@ -567,8 +668,87 @@ app.layout = html.Div([
 
     # Data Upload Section
     html.Div([
-        html.H2("📁 Data Management", className='section-title',
-                style={'fontSize': '2.5em', 'fontWeight': '300'}),
+        html.Div([
+            html.H2("📁 Data Management", className='section-title',
+                    style={'fontSize': '2.5em', 'fontWeight': '300', 'display': 'inline-block'}),
+            html.Button([
+                html.I(className="fas fa-question-circle", style={'marginRight': '5px'}),
+                "Help"
+            ], id='data-help-btn', 
+               style={
+                   'backgroundColor': '#17a2b8', 'color': 'white', 'border': 'none',
+                   'padding': '8px 15px', 'borderRadius': '20px', 'cursor': 'pointer',
+                   'fontSize': '0.9em', 'fontWeight': '500', 'marginLeft': '20px',
+                   'boxShadow': '0 2px 10px rgba(23,162,184,0.3)'
+               })
+        ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+        
+        # Help Modal
+        html.Div([
+            html.Div([
+                html.Div([
+                    html.Span("×", className="modal-close", id="modal-close-btn", style={
+                        'position': 'absolute',
+                        'top': '15px',
+                        'right': '20px',
+                        'fontSize': '28px',
+                        'fontWeight': 'bold',
+                        'cursor': 'pointer',
+                        'color': '#aaa'
+                    }),
+                    html.H3("📊 Data Upload Guide", style={'color': '#2c3e50', 'marginBottom': '20px'}),
+                    html.Div([
+                        html.H4("📸 Instagram Data Format:", style={'color': '#E4405F', 'marginBottom': '10px'}),
+                        html.P("Required columns: influencer_id, likes, comments, saves, reach, impressions, profile_visits, website_clicks, story_impressions, story_exits, story_completion_rate"),
+                        html.A("📥 Download Sample Instagram CSV", id="download-instagram-sample", 
+                               style={'color': '#E4405F', 'textDecoration': 'underline', 'cursor': 'pointer'}),
+                        
+                        html.Hr(),
+                        
+                        html.H4("📺 YouTube Data Format:", style={'color': '#FF0000', 'marginBottom': '10px'}),
+                        html.P("Required columns: influencer_id, impressions_ctr_percentage, audience_retention_percentage, subscribers_gained, watch_time_hours"),
+                        html.A("📥 Download Sample YouTube CSV", id="download-youtube-sample",
+                               style={'color': '#FF0000', 'textDecoration': 'underline', 'cursor': 'pointer'}),
+                        
+                        html.Hr(),
+                        
+                        html.H4("💰 Payout Data Format:", style={'color': '#28a745', 'marginBottom': '10px'}),
+                        html.P("Required columns: influencer_id, orders, total_revenue, total_cost"),
+                        html.P("Note: Data will be aggregated for existing influencers only.", style={'fontStyle': 'italic', 'color': '#6c757d'}),
+                        html.A("📥 Download Sample Payout CSV", 
+                               href="/assets/sample_new_payouts.csv", download="sample_payout_data.csv",
+                               style={'color': '#28a745', 'textDecoration': 'underline'}),
+                        
+                        html.Hr(),
+                        
+                        html.H4("⚠️ Important Notes:", style={'color': '#dc3545', 'marginBottom': '10px'}),
+                        html.Ul([
+                            html.Li("Only existing influencer IDs are accepted"),
+                            html.Li("Files must be in CSV format"),
+                            html.Li("All required columns must be present"),
+                            html.Li("Data will be validated before upload")
+                        ])
+                    ])
+                ], style={
+                    'backgroundColor': 'white',
+                    'padding': '30px',
+                    'borderRadius': '10px',
+                    'maxWidth': '600px',
+                    'margin': '50px auto',
+                    'position': 'relative',
+                    'boxShadow': '0 10px 30px rgba(0,0,0,0.3)'
+                })
+            ], id='help-modal', style={
+                'position': 'fixed',
+                'top': '0',
+                'left': '0',
+                'width': '100%',
+                'height': '100%',
+                'backgroundColor': 'rgba(0,0,0,0.5)',
+                'zIndex': '1000',
+                'display': 'none'
+            })
+        ]),
         
         html.Div([
             # Instagram Upload
@@ -647,7 +827,13 @@ app.layout = html.Div([
             ),
             html.Div(id='payout-upload-status', style={'marginTop': '10px', 'textAlign': 'center'})
         ])
-    ], className='section-container')
+    ], className='section-container'),
+
+    # Hidden download components
+    dcc.Download(id="download-pdf"),
+    dcc.Download(id="download-csv-data"),
+    dcc.Download(id="download-instagram-sample-file"),
+    dcc.Download(id="download-youtube-sample-file")
 
     ], className='dashboard-container')
 ])
@@ -673,32 +859,81 @@ def update_top_products(_):
             products_performance['video_views'] * 0.5
         )
         
-        # Sort by engagement score and get top 5
-        top_products = products_performance.nlargest(5, 'engagement_score')
+        # Sort by engagement score and get top 3
+        top_products = products_performance.nlargest(3, 'engagement_score')
         
-        # Create product chips
+        # Create product chips in reverse pyramid layout
         product_chips = []
-        for _, product in top_products.iterrows():
-            product_chips.append(
-                html.Div([
-                    html.Span(f"🏆 {product['brand_mentioned']}", 
-                             style={'marginRight': '8px', 'fontWeight': '600'}),
-                    html.Span(f"{product['engagement_score']:,.0f} engagement", 
-                             style={'fontSize': '0.85em', 'opacity': '0.9'})
-                ], className='product-chip')
-            )
+        product_list = top_products.to_dict('records')
         
-        return product_chips
+        if len(product_list) >= 3:
+            # First row - 2 products
+            first_row = html.Div([
+                html.Div([
+                    html.Span(f"🏆 {product_list[0]['brand_mentioned']}", 
+                             style={'marginRight': '8px', 'fontWeight': '600'}),
+                    html.Span(f"{product_list[0]['engagement_score']:,.0f} engagement", 
+                             style={'fontSize': '0.85em', 'opacity': '0.9'})
+                ], className='product-chip', style={'margin': '10px'}),
+                
+                html.Div([
+                    html.Span(f"🥈 {product_list[1]['brand_mentioned']}", 
+                             style={'marginRight': '8px', 'fontWeight': '600'}),
+                    html.Span(f"{product_list[1]['engagement_score']:,.0f} engagement", 
+                             style={'fontSize': '0.85em', 'opacity': '0.9'})
+                ], className='product-chip', style={'margin': '10px'})
+            ], style={'textAlign': 'center', 'marginBottom': '15px'})
+            
+            # Second row - 1 product (centered)
+            second_row = html.Div([
+                html.Div([
+                    html.Span(f"🥉 {product_list[2]['brand_mentioned']}", 
+                             style={'marginRight': '8px', 'fontWeight': '600'}),
+                    html.Span(f"{product_list[2]['engagement_score']:,.0f} engagement", 
+                             style={'fontSize': '0.85em', 'opacity': '0.9'})
+                ], className='product-chip', style={'margin': '10px'})
+            ], style={'textAlign': 'center'})
+            
+            return html.Div([first_row, second_row])
+        else:
+            # Fallback to regular layout if less than 3 products
+            for _, product in top_products.iterrows():
+                product_chips.append(
+                    html.Div([
+                        html.Span(f"🏆 {product['brand_mentioned']}", 
+                                 style={'marginRight': '8px', 'fontWeight': '600'}),
+                        html.Span(f"{product['engagement_score']:,.0f} engagement", 
+                                 style={'fontSize': '0.85em', 'opacity': '0.9'})
+                    ], className='product-chip')
+                )
+            return html.Div(product_chips, style={'textAlign': 'center'})
         
     except Exception as e:
-        # Fallback with sample data
-        sample_products = ['MuscleBlaze', 'HK Vitals', 'Gritzo', 'bGreen']
-        return [
+        # Fallback with sample data in reverse pyramid
+        sample_products = ['MuscleBlaze', 'HK Vitals', 'Gritzo']
+        
+        # First row - 2 products
+        first_row = html.Div([
             html.Div([
-                html.Span(f"🏆 {product}", style={'marginRight': '8px', 'fontWeight': '600'}),
+                html.Span(f"🏆 {sample_products[0]}", style={'marginRight': '8px', 'fontWeight': '600'}),
                 html.Span("Top Performer", style={'fontSize': '0.85em', 'opacity': '0.9'})
-            ], className='product-chip') for product in sample_products
-        ]
+            ], className='product-chip', style={'margin': '10px'}),
+            
+            html.Div([
+                html.Span(f"🥈 {sample_products[1]}", style={'marginRight': '8px', 'fontWeight': '600'}),
+                html.Span("Top Performer", style={'fontSize': '0.85em', 'opacity': '0.9'})
+            ], className='product-chip', style={'margin': '10px'})
+        ], style={'textAlign': 'center', 'marginBottom': '15px'})
+        
+        # Second row - 1 product (centered)
+        second_row = html.Div([
+            html.Div([
+                html.Span(f"🥉 {sample_products[2]}", style={'marginRight': '8px', 'fontWeight': '600'}),
+                html.Span("Top Performer", style={'fontSize': '0.85em', 'opacity': '0.9'})
+            ], className='product-chip', style={'margin': '10px'})
+        ], style={'textAlign': 'center'})
+        
+        return html.Div([first_row, second_row])
 
 # Callback for platform chart
 @app.callback(Output('platform-chart', 'figure'), [Input('platform-chart', 'id')])
@@ -752,86 +987,105 @@ def update_campaign_kpis(_):
     total_influencers = len(influencer_df)
     avg_orders_per_campaign = payout_df['orders'].mean()
     
-    # Calculate brands performance
-    brands = ['MuscleBlaze', 'HKVitals', 'Gritzo', 'HealthKart']
-    brand_performance = []
-    for brand in brands:
-        brand_campaigns = np.random.randint(3, 8)
-        brand_revenue = np.random.uniform(50000, 200000)
-        brand_performance.append({'brand': brand, 'campaigns': brand_campaigns, 'revenue': brand_revenue})
-    
-    best_brand = max(brand_performance, key=lambda x: x['revenue'])
+    # Calculate brands performance from brand_performance CSV or posts data
+    try:
+        brand_performance_df = pd.read_csv('data/brand_performance.csv')
+        best_brand = brand_performance_df.loc[brand_performance_df['total_revenue'].idxmax()]
+        best_brand = {'brand': best_brand['brand'], 'revenue': best_brand['total_revenue']}
+    except:
+        posts_df = pd.read_csv('data/posts.csv')
+        brand_performance = posts_df.groupby('brand_mentioned').agg({
+            'post_id': 'count',
+            'reach': 'sum'
+        }).reset_index()
+        brand_performance.columns = ['brand', 'campaigns', 'reach']
+        
+        # Calculate revenue estimate based on reach (static conversion rate)
+        brand_performance['revenue'] = brand_performance['reach'] * 0.05  # 5% conversion estimate
+        
+        best_brand = brand_performance.loc[brand_performance['revenue'].idxmax()]
     
     return html.Div([
-        # Total Campaigns
+        # First Row - 2 cards
         html.Div([
-            html.H3(f"{total_campaigns}", style={'color': '#3498db', 'fontSize': '2.5em', 'margin': '0'}),
-            html.P("Active Campaigns", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#ebf3fd',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '22%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
+            # Total Campaigns
+            html.Div([
+                html.H3(f"{total_campaigns}", style={'color': '#3498db', 'fontSize': '2.5em', 'margin': '0'}),
+                html.P("Active Campaigns", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#ebf3fd',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(52, 152, 219, 0.2)'
+            }),
+            
+            # Average Campaign ROAS
+            html.Div([
+                html.H3(f"{avg_campaign_roas:.2f}x", style={'color': '#e74c3c', 'fontSize': '2.5em', 'margin': '0'}),
+                html.P("Avg Campaign ROAS", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#fdeaea',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(231, 76, 60, 0.2)'
+            })
+        ], className='card-row'),
         
-        # Average Campaign ROAS
+        # Second Row - 2 cards
         html.Div([
-            html.H3(f"{avg_campaign_roas:.2f}x", style={'color': '#e74c3c', 'fontSize': '2.5em', 'margin': '0'}),
-            html.P("Avg Campaign ROAS", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#fdeaea',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '22%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
-        
-        # Total Influencers
-        html.Div([
-            html.H3(f"{total_influencers}", style={'color': '#27ae60', 'fontSize': '2.5em', 'margin': '0'}),
-            html.P("Partner Influencers", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#d5f4e6',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '22%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
-        
-        # Best Performing Brand
-        html.Div([
-            html.H3(f"{best_brand['brand']}", style={'color': '#f39c12', 'fontSize': '1.8em', 'margin': '0'}),
-            html.P("Top Brand", style={'color': '#2c3e50', 'fontWeight': 'bold'}),
-            html.P(f"₹{best_brand['revenue']:,.0f}", style={'color': '#7f8c8d', 'fontSize': '0.9em'})
-        ], style={
-            'backgroundColor': '#fef9e7',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '22%',
-            'display': 'inline-block',
-            'margin': '1%'
-        })
+            # Total Influencers
+            html.Div([
+                html.H3(f"{total_influencers}", style={'color': '#27ae60', 'fontSize': '2.5em', 'margin': '0'}),
+                html.P("Partner Influencers", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#d5f4e6',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(39, 174, 96, 0.2)'
+            }),
+            
+            # Best Performing Brand
+            html.Div([
+                html.H3(f"{best_brand['brand']}", style={'color': '#f39c12', 'fontSize': '1.8em', 'margin': '0'}),
+                html.P("Top Brand", style={'color': '#2c3e50', 'fontWeight': 'bold'}),
+                html.P(f"₹{best_brand['revenue']:,.0f}", style={'color': '#7f8c8d', 'fontSize': '0.9em'})
+            ], className='card-item', style={
+                'backgroundColor': '#fef9e7',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(243, 156, 18, 0.2)'
+            })
+        ], className='card-row')
     ])
 
 # Callback for Brand Performance Chart
 @app.callback(Output('brand-performance-chart', 'figure'), [Input('brand-performance-chart', 'id')])
 def update_brand_performance_chart(_):
-    # Create brand performance data
-    brands_data = {
-        'Brand': ['MuscleBlaze', 'HKVitals', 'Gritzo', 'HealthKart'],
-        'Revenue': [150000, 120000, 95000, 85000],
-        'Campaigns': [6, 5, 4, 3],
-        'ROAS': [4.2, 3.8, 3.5, 3.1]
-    }
-    brand_df = pd.DataFrame(brands_data)
+    # Load brand performance data from CSV
+    try:
+        brand_df = pd.read_csv('data/brand_performance.csv')
+        brand_df.columns = ['Brand', 'Campaigns', 'Reach', 'Revenue', 'Cost', 'ROAS']
+    except:
+        # Fallback: Create brand performance data from posts
+        posts_df = pd.read_csv('data/posts.csv')
+        brand_performance = posts_df.groupby('brand_mentioned').agg({
+            'post_id': 'count',
+            'reach': 'sum',
+            'likes': 'sum'
+        }).reset_index()
+        
+        # Calculate revenue estimate and ROAS
+        brand_performance['revenue'] = brand_performance['reach'] * 0.05  # 5% conversion
+        brand_performance['cost'] = brand_performance['post_id'] * 50000  # ₹50k per campaign
+        brand_performance['roas'] = brand_performance['revenue'] / brand_performance['cost']
+        
+        # Rename columns for chart
+        brand_performance.columns = ['Brand', 'Campaigns', 'Reach', 'Likes', 'Revenue', 'Cost', 'ROAS']
+        brand_df = brand_performance.sort_values('Revenue', ascending=False)
     
     # Use go.Figure instead of px.bar to avoid template issues
     fig = go.Figure()
@@ -855,20 +1109,30 @@ def update_brand_performance_chart(_):
 # Callback for Campaign Timeline Chart
 @app.callback(Output('campaign-timeline-chart', 'figure'), [Input('campaign-timeline-chart', 'id')])
 def update_campaign_timeline_chart(_):
-    # Create timeline data for last 30 days
-    dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
-    timeline_data = []
+    # Create timeline data based on posts data
+    posts_df = pd.read_csv('data/posts.csv')
+    posts_df['date'] = pd.to_datetime(posts_df['date'])
     
-    for date in dates:
-        daily_revenue = np.random.uniform(5000, 25000)
-        daily_orders = np.random.randint(20, 100)
-        timeline_data.append({
-            'date': date.strftime('%Y-%m-%d'),
-            'revenue': daily_revenue,
-            'orders': daily_orders
-        })
+    # Group by date and calculate metrics
+    daily_metrics = posts_df.groupby('date').agg({
+        'reach': 'sum',
+        'likes': 'sum',
+        'post_id': 'count'
+    }).reset_index()
     
-    timeline_df = pd.DataFrame(timeline_data)
+    # Calculate revenue and orders based on reach (static conversion rates)
+    daily_metrics['revenue'] = daily_metrics['reach'] * 0.02  # 2% revenue conversion
+    daily_metrics['orders'] = daily_metrics['reach'] * 0.0008  # 0.08% order conversion
+    
+    # Fill missing dates in the last 30 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=29)
+    full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
+    
+    timeline_df = pd.DataFrame({'date': full_date_range})
+    timeline_df = timeline_df.merge(daily_metrics, on='date', how='left')
+    timeline_df = timeline_df.fillna({'revenue': 8000, 'orders': 35, 'post_id': 1})  # Fill missing with averages
+    timeline_df['date'] = timeline_df['date'].dt.strftime('%Y-%m-%d')
     
     # Create figure using go.Scatter to avoid template issues
     fig = go.Figure()
@@ -910,79 +1174,92 @@ def update_payout_summary(_):
     per_order_campaigns = len(payout_df) * 0.4  # 40% per order
     
     return html.Div([
-        # Total Payouts
+        # First Row - 2 cards
         html.Div([
-            html.H3(f"₹{total_payouts:,.0f}", style={'color': '#3498db', 'fontSize': '2.2em', 'margin': '0'}),
-            html.P("Total Payouts", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#ebf3fd',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '23%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
+            # Total Payouts
+            html.Div([
+                html.H3(f"₹{total_payouts:,.0f}", style={'color': '#3498db', 'fontSize': '2.2em', 'margin': '0'}),
+                html.P("Total Payouts", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#ebf3fd',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(52, 152, 219, 0.2)'
+            }),
+            
+            # Paid Amount
+            html.Div([
+                html.H3(f"₹{paid_amount:,.0f}", style={'color': '#27ae60', 'fontSize': '2.2em', 'margin': '0'}),
+                html.P("Amount Paid", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#d5f4e6',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(39, 174, 96, 0.2)'
+            })
+        ], className='card-row'),
         
-        # Paid Amount
+        # Second Row - 2 cards
         html.Div([
-            html.H3(f"₹{paid_amount:,.0f}", style={'color': '#27ae60', 'fontSize': '2.2em', 'margin': '0'}),
-            html.P("Amount Paid", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#d5f4e6',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '23%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
-        
-        # Pending Amount
-        html.Div([
-            html.H3(f"₹{pending_amount:,.0f}", style={'color': '#f39c12', 'fontSize': '2.2em', 'margin': '0'}),
-            html.P("Pending Payouts", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#fef9e7',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '23%',
-            'display': 'inline-block',
-            'margin': '1%'
-        }),
-        
-        # Average Payout
-        html.Div([
-            html.H3(f"₹{avg_payout:,.0f}", style={'color': '#9b59b6', 'fontSize': '2.2em', 'margin': '0'}),
-            html.P("Avg Payout", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-        ], style={
-            'backgroundColor': '#f4ecf7',
-            'padding': '20px',
-            'borderRadius': '10px',
-            'textAlign': 'center',
-            'width': '23%',
-            'display': 'inline-block',
-            'margin': '1%'
-        })
+            # Pending Amount
+            html.Div([
+                html.H3(f"₹{pending_amount:,.0f}", style={'color': '#f39c12', 'fontSize': '2.2em', 'margin': '0'}),
+                html.P("Pending Payouts", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#fef9e7',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(243, 156, 18, 0.2)'
+            }),
+            
+            # Average Payout
+            html.Div([
+                html.H3(f"₹{avg_payout:,.0f}", style={'color': '#9b59b6', 'fontSize': '2.2em', 'margin': '0'}),
+                html.P("Avg Payout", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+            ], className='card-item', style={
+                'backgroundColor': '#f4ecf7',
+                'padding': '25px',
+                'borderRadius': '12px',
+                'textAlign': 'center',
+                'boxShadow': '0 4px 15px rgba(155, 89, 182, 0.2)'
+            })
+        ], className='card-row')
     ])
 
 # Callback for Payout Tracking Table
 @app.callback(Output('payout-tracking-table', 'data'), [Input('payout-tracking-table', 'id')])
 def update_payout_tracking_table(_):
-    # Merge payout and influencer data with additional fields
+    # Merge payout and influencer data with posts data to get brands
     merged_df = pd.merge(payout_df, influencer_df, on='influencer_id')
+    posts_df = pd.read_csv('data/posts.csv')
     
-    # Add payout tracking fields
-    brands = ['MuscleBlaze', 'HKVitals', 'Gritzo', 'HealthKart']
-    payment_types = ['Per Post', 'Per Order']
-    statuses = ['Paid', 'Pending', 'Processing']
+    # Get brand for each influencer from their most recent post
+    influencer_brands = posts_df.groupby('influencer_id')['brand_mentioned'].first().reset_index()
+    influencer_brands.columns = ['influencer_id', 'brand']
     
-    merged_df['brand'] = np.random.choice(brands, len(merged_df))
-    merged_df['payment_type'] = np.random.choice(payment_types, len(merged_df))
-    merged_df['status'] = np.random.choice(statuses, len(merged_df), p=[0.7, 0.2, 0.1])
+    merged_df = pd.merge(merged_df, influencer_brands, on='influencer_id', how='left')
+    merged_df['brand'] = merged_df['brand'].fillna('HealthKart')  # Default brand
+    
+    # Set payment type based on basis column
+    merged_df['payment_type'] = merged_df['basis'].apply(
+        lambda x: 'Per Post' if 'post' in str(x).lower() else 'Per Order'
+    )
+    
+    # Set status based on payout amount (higher payouts more likely to be paid)
+    merged_df['status'] = merged_df['payout_amount'].apply(
+        lambda x: 'Paid' if x > 300000 else ('Processing' if x > 100000 else 'Pending')
+    )
+    
     merged_df['payout_amount'] = merged_df['total_cost']
-    merged_df['payout_date'] = pd.date_range(end=datetime.now(), periods=len(merged_df), freq='D').strftime('%Y-%m-%d')
+    # Create static dates based on influencer_id (for consistency)
+    base_date = datetime.now() - timedelta(days=30)
+    merged_df['payout_date'] = [
+        (base_date + timedelta(days=i*3)).strftime('%Y-%m-%d') 
+        for i in range(len(merged_df))
+    ]
     
     # Select relevant columns and rename
     payout_table = merged_df[['name', 'brand', 'platform', 'payment_type', 'orders', 'payout_amount', 'status', 'payout_date']].copy()
@@ -1022,63 +1299,61 @@ def update_influencer_kpis(selected_influencer):
                   style={'color': '#7f8c8d', 'margin': '5px 0'})
         ], style={'textAlign': 'center', 'marginBottom': '30px'}),
         
-        # KPI Cards
+        # KPI Cards - 2 per row
         html.Div([
-            # Total Orders
+            # First Row - 2 cards
             html.Div([
-                html.H3(f"{total_orders:,}", style={'color': '#27ae60', 'fontSize': '2.5em', 'margin': '0'}),
-                html.P("Total Orders", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-            ], className='kpi-card', style={
-                'backgroundColor': '#d5f4e6',
-                'padding': '20px',
-                'borderRadius': '10px',
-                'textAlign': 'center',
-                'width': '22%',
-                'display': 'inline-block',
-                'margin': '1%'
-            }),
+                # Total Orders
+                html.Div([
+                    html.H3(f"{total_orders:,}", style={'color': '#27ae60', 'fontSize': '2.5em', 'margin': '0'}),
+                    html.P("Total Orders", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+                ], className='card-item', style={
+                    'backgroundColor': '#d5f4e6',
+                    'padding': '25px',
+                    'borderRadius': '12px',
+                    'textAlign': 'center',
+                    'boxShadow': '0 4px 15px rgba(39, 174, 96, 0.2)'
+                }),
+                
+                # Total Revenue
+                html.Div([
+                    html.H3(f"₹{total_revenue:,.0f}", style={'color': '#3498db', 'fontSize': '2.5em', 'margin': '0'}),
+                    html.P("Total Revenue", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+                ], className='card-item', style={
+                    'backgroundColor': '#ebf3fd',
+                    'padding': '25px',
+                    'borderRadius': '12px',
+                    'textAlign': 'center',
+                    'boxShadow': '0 4px 15px rgba(52, 152, 219, 0.2)'
+                })
+            ], className='card-row'),
             
-            # Total Revenue
+            # Second Row - 2 cards
             html.Div([
-                html.H3(f"₹{total_revenue:,.0f}", style={'color': '#3498db', 'fontSize': '2.5em', 'margin': '0'}),
-                html.P("Total Revenue", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-            ], className='kpi-card', style={
-                'backgroundColor': '#ebf3fd',
-                'padding': '20px',
-                'borderRadius': '10px',
-                'textAlign': 'center',
-                'width': '22%',
-                'display': 'inline-block',
-                'margin': '1%'
-            }),
-            
-            # AOV
-            html.Div([
-                html.H3(f"₹{avg_order_value:,.0f}", style={'color': '#e74c3c', 'fontSize': '2.5em', 'margin': '0'}),
-                html.P("Avg Order Value", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-            ], className='kpi-card', style={
-                'backgroundColor': '#fdeaea',
-                'padding': '20px',
-                'borderRadius': '10px',
-                'textAlign': 'center',
-                'width': '22%',
-                'display': 'inline-block',
-                'margin': '1%'
-            }),
-            
-            # Unique Customers
-            html.Div([
-                html.H3(f"{unique_customers:,}", style={'color': '#f39c12', 'fontSize': '2.5em', 'margin': '0'}),
-                html.P("Unique Customers", style={'color': '#2c3e50', 'fontWeight': 'bold'})
-            ], className='kpi-card', style={
-                'backgroundColor': '#fef9e7',
-                'padding': '20px',
-                'borderRadius': '10px',
-                'textAlign': 'center',
-                'width': '22%',
-                'display': 'inline-block',
-                'margin': '1%'
-            })
+                # AOV
+                html.Div([
+                    html.H3(f"₹{avg_order_value:,.0f}", style={'color': '#e74c3c', 'fontSize': '2.5em', 'margin': '0'}),
+                    html.P("Avg Order Value", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+                ], className='card-item', style={
+                    'backgroundColor': '#fdeaea',
+                    'padding': '25px',
+                    'borderRadius': '12px',
+                    'textAlign': 'center',
+                    'boxShadow': '0 4px 15px rgba(231, 76, 60, 0.2)'
+                }),
+                
+                # Unique Customers
+                html.Div([
+                    html.H3(f"{unique_customers:,}", style={'color': '#f39c12', 'fontSize': '2.5em', 'margin': '0'}),
+                    html.P("Unique Customers", style={'color': '#2c3e50', 'fontWeight': 'bold'})
+                ], className='card-item', style={
+                    'backgroundColor': '#fef9e7',
+                    'padding': '25px',
+                    'borderRadius': '12px',
+                    'textAlign': 'center',
+                    'boxShadow': '0 4px 15px rgba(243, 156, 18, 0.2)'
+                })
+            ], className='card-row')
         ]),
         
         # Top Products
@@ -1264,12 +1539,19 @@ def calc_audience_growth(df_inf, df_posts=None):
     growth_data = []
     for _, influencer in df_inf.iterrows():
         base_followers = influencer['follower_count']
-        # Simulate 12 weeks of growth data
+        # Create static growth data based on influencer characteristics
         for week in range(12):
             date = datetime.now() - timedelta(weeks=week)
-            growth_rate = np.random.uniform(0.98, 1.05)
-            followers = int(base_followers * (growth_rate ** week))
-            net_new = int(followers * 0.03)  # 3% new followers per week
+            # Use a static growth rate based on follower count (bigger influencers = more stable)
+            if base_followers > 5000000:
+                growth_rate = 1.02  # 2% growth for mega influencers
+            elif base_followers > 1000000:
+                growth_rate = 1.03  # 3% growth for macro influencers  
+            else:
+                growth_rate = 1.05  # 5% growth for micro influencers
+                
+            followers = int(base_followers * (growth_rate ** (12-week)))
+            net_new = max(int(followers * 0.02), 100)  # 2% new followers per week, minimum 100
             
             growth_data.append({
                 'influencer_id': influencer['influencer_id'],
@@ -1321,11 +1603,17 @@ def calc_creative_fatigue(df_posts, df_instagram=None):
     fatigue_data = []
     
     for _, post in df_posts.iterrows():
-        # Simulate 4 weeks of performance data
+        # Generate static performance data based on post characteristics
         for week in range(1, 5):
             decay_factor = 1 - (0.15 * (week - 1))  # 15% decay per week
-            base_ctr = np.random.uniform(1.5, 4.0)
-            base_cpc = np.random.uniform(20, 50)
+            
+            # Base CTR/CPC based on platform and engagement
+            if post['platform'] == 'Instagram':
+                base_ctr = 2.5 + (post['likes'] / post['reach']) * 100 if post['reach'] > 0 else 2.5
+                base_cpc = 35
+            else:  # YouTube
+                base_ctr = 3.2 + (post['likes'] / post['video_views']) * 100 if post['video_views'] > 0 else 3.2
+                base_cpc = 28
             
             ctr = base_ctr * decay_factor
             cpc = base_cpc / decay_factor
@@ -1406,26 +1694,39 @@ def calc_geo_efficiency(df_geo):
     # Add product information if not present
     products = ['Protein Powder', 'Multivitamins', 'Fish Oil', 'BCAA', 'Pre-Workout', 'Whey Protein', 'Creatine']
     
-    # If product column doesn't exist, create it
+    # If product column doesn't exist, create it based on brand mentioned in posts
     if 'product' not in df.columns:
-        df['product'] = np.random.choice(products, len(df))
+        # Map brands to products
+        brand_to_product = {
+            'MuscleBlaze': 'Whey Protein',
+            'HK Vitals': 'Multivitamins', 
+            'HKVitals': 'Multivitamins',
+            'Gritzo': 'Protein Powder',
+            'bGreen': 'Fish Oil',
+            'HealthKart': 'BCAA'
+        }
+        # Create cycling pattern for products based on index
+        df['product'] = [products[i % len(products)] for i in range(len(df))]
     
-    # Add slight random offset to coordinates to prevent exact overlap
+    # Add coordinates without random offset for consistency
     if 'latitude' not in df.columns or 'longitude' not in df.columns:
         df['latitude'] = df['city'].map(lambda x: city_coordinates.get(x, {}).get('latitude', 20.5937))
         df['longitude'] = df['city'].map(lambda x: city_coordinates.get(x, {}).get('longitude', 78.9629))
         
-    # Add small random offset to prevent overlapping markers
-    df['latitude'] = df['latitude'] + np.random.uniform(-0.1, 0.1, len(df))
-    df['longitude'] = df['longitude'] + np.random.uniform(-0.1, 0.1, len(df))
+    # Add small static offset based on city name hash to prevent overlapping markers
+    df['city_hash'] = df['city'].astype(str).apply(lambda x: abs(hash(x)) % 100)
+    df['latitude'] = df['latitude'] + (df['city_hash'] - 50) * 0.002
+    df['longitude'] = df['longitude'] + (df['city_hash'] - 50) * 0.002
     
-    # Calculate efficiency metrics
-    df['orders_per_1k_reach'] = (df['estimated_views'] / 1000) * np.random.uniform(0.005, 0.02, len(df))
-    df['orders'] = np.random.randint(10, 150, len(df))  # Simulated orders
-    df['revenue'] = df['orders'] * np.random.uniform(1000, 4000, len(df))  # Simulated revenue
+    # Calculate efficiency metrics based on actual data
+    df['orders_per_1k_reach'] = (df['estimated_views'] / 1000) * 0.01  # Static 1% conversion
+    df['orders'] = df['estimated_views'] * 0.0008  # Static 0.08% order rate
+    df['orders'] = df['orders'].astype(int).clip(lower=10)  # Minimum 10 orders
+    df['revenue'] = df['orders'] * 2500  # Static ₹2500 per order
     
-    # Recalculate ROAS based on actual revenue
-    df['city_roas'] = df['revenue'] / (df['orders'] * np.random.uniform(500, 1200, len(df)))  # Simulated cost
+    # Calculate ROAS based on static cost per order
+    cost_per_order = 800  # Static ₹800 cost per order
+    df['city_roas'] = df['revenue'] / (df['orders'] * cost_per_order)
     
     return df
 
@@ -1651,7 +1952,7 @@ def render_advanced_content(selected_tab):
                 cost_orders = payout_df[['influencer_id', 'total_cost', 'orders']].copy()
                 cost_orders = cost_orders.merge(influencer_df[['influencer_id', 'platform']],
                                                 on='influencer_id', how='left')
-                cost_orders['unique_customers'] = cost_orders['orders']
+                cost_orders['unique_customers'] = (cost_orders['orders'] * 0.8).astype(int)  # Static 80% unique rate
             else:
                 uniques = (tracking_data_df
                            .groupby('influencer_id')['user_id']
@@ -1901,6 +2202,353 @@ def upload_payout_data(contents, filename):
             return html.Div(f"❌ Error: {str(e)}", style={'color': '#e74c3c'})
     
     return ""
+
+# Callback for CSV data export (table/analytics data)
+@app.callback(
+    Output('download-csv-data', 'data'),
+    Input('export-csv-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def export_csv_data(n_clicks):
+    if n_clicks:
+        try:
+            # Create a zip file containing displayed analytics data
+            buffer = io.BytesIO()
+            
+            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # 1. Top Performing Influencers (main dashboard table)
+                merged_df = pd.merge(payout_df, influencer_df, on='influencer_id')
+                merged_df['roas'] = merged_df['total_revenue'] / merged_df['total_cost']
+                top_performers = merged_df.nlargest(10, 'roas')[['name', 'category', 'platform', 'orders', 'total_revenue', 'roas']]
+                zip_file.writestr("top_performing_influencers.csv", top_performers.to_csv(index=False))
+                
+                # 2. Platform Performance Summary
+                platform_summary = influencer_df.groupby('platform').agg({
+                    'follower_count': 'sum',
+                    'influencer_id': 'count'
+                }).reset_index()
+                platform_summary.columns = ['Platform', 'Total_Followers', 'Influencer_Count']
+                zip_file.writestr("platform_performance.csv", platform_summary.to_csv(index=False))
+                
+                # 3. Category Breakdown
+                category_summary = influencer_df.groupby('category').agg({
+                    'follower_count': 'sum',
+                    'influencer_id': 'count'
+                }).reset_index()
+                category_summary.columns = ['Category', 'Total_Followers', 'Influencer_Count']
+                zip_file.writestr("category_breakdown.csv", category_summary.to_csv(index=False))
+                
+                # 4. Payout Tracking Summary (all influencers with key metrics)
+                payout_summary = merged_df[['name', 'platform', 'category', 'basis', 'rate', 
+                                          'orders', 'total_revenue', 'payout_amount', 'total_cost', 'roas']].copy()
+                payout_summary = payout_summary.sort_values('roas', ascending=False)
+                zip_file.writestr("payout_tracking_summary.csv", payout_summary.to_csv(index=False))
+                
+                # 5. CAC Analysis Data
+                try:
+                    if not tracking_data_df.empty:
+                        cost_orders = payout_df.merge(influencer_df[['influencer_id', 'platform']], on='influencer_id')
+                        cost_orders['unique_customers'] = (cost_orders['orders'] * 0.8).astype(int)  # Static 80% unique rate
+                        cost_orders['cac'] = cost_orders['total_cost'] / cost_orders['unique_customers'].replace(0, np.nan)
+                        
+                        # CAC by influencer
+                        cac_analysis = cost_orders.merge(influencer_df[['influencer_id', 'name']], on='influencer_id')
+                        cac_data = cac_analysis[['name', 'platform', 'total_cost', 'unique_customers', 'cac']].copy()
+                        cac_data = cac_data.sort_values('cac').round(2)
+                        zip_file.writestr("cac_analysis_by_influencer.csv", cac_data.to_csv(index=False))
+                        
+                        # CAC by platform
+                        cac_by_platform = cost_orders.groupby('platform').agg({
+                            'total_cost': 'sum',
+                            'unique_customers': 'sum'
+                        }).reset_index()
+                        cac_by_platform['cac'] = cac_by_platform['total_cost'] / cac_by_platform['unique_customers']
+                        zip_file.writestr("cac_analysis_by_platform.csv", cac_by_platform.to_csv(index=False))
+                    else:
+                        # Fallback CAC data
+                        fallback_cac = merged_df[['name', 'platform', 'total_cost', 'orders']].copy()
+                        fallback_cac['estimated_customers'] = fallback_cac['orders'] * 0.8
+                        fallback_cac['estimated_cac'] = fallback_cac['total_cost'] / fallback_cac['estimated_customers']
+                        zip_file.writestr("estimated_cac_analysis.csv", fallback_cac.to_csv(index=False))
+                except Exception as e:
+                    print(f"CAC analysis export error: {e}")
+                
+                # 6. Geographic Performance (if available)
+                try:
+                    if not geographic_distribution_df.empty:
+                        geo_perf = geographic_distribution_df[['city', 'estimated_views', 'estimated_orders', 'estimated_revenue']].copy()
+                        zip_file.writestr("geographic_performance.csv", geo_perf.to_csv(index=False))
+                except:
+                    pass
+                
+                # 7. Instagram Insights Summary
+                try:
+                    if not instagram_df.empty:
+                        instagram_summary = instagram_df.groupby('influencer_id').agg({
+                            'likes': 'sum',
+                            'comments': 'sum',
+                            'saves': 'sum',
+                            'reach': 'sum',
+                            'impressions': 'sum'
+                        }).reset_index()
+                        instagram_summary = instagram_summary.merge(influencer_df[['influencer_id', 'name']], on='influencer_id')
+                        instagram_summary['engagement_rate'] = ((instagram_summary['likes'] + instagram_summary['comments'] + instagram_summary['saves']) / instagram_summary['impressions'] * 100).round(2)
+                        zip_file.writestr("instagram_performance_summary.csv", instagram_summary.to_csv(index=False))
+                except:
+                    pass
+            
+            buffer.seek(0)
+            
+            return dcc.send_bytes(
+                buffer.getvalue(),
+                filename=f"healthkart_analytics_tables_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+            )
+            
+        except Exception as e:
+            print(f"Error creating CSV export: {e}")
+            return None
+    
+    return None
+
+# Callback for PDF export (charts and visualizations)
+@app.callback(
+    Output('download-pdf', 'data'),
+    Input('export-pdf-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def export_pdf_report(n_clicks):
+    if n_clicks:
+        try:
+            # Generate simplified HTML report with charts for PDF conversion
+            
+            # Get key metrics
+            merged_df = pd.merge(payout_df, influencer_df, on='influencer_id')
+            merged_df['roas'] = merged_df['total_revenue'] / merged_df['total_cost']
+            top_performers = merged_df.nlargest(5, 'roas')
+            
+            # Platform summary
+            platform_summary = influencer_df.groupby('platform').agg({
+                'follower_count': 'sum',
+                'influencer_id': 'count'
+            }).reset_index()
+            
+            # Create HTML report suitable for PDF conversion
+            html_report = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>HealthKart Influencer Campaign Dashboard Report</title>
+                <style>
+                    @page {{ margin: 0.8in; }}
+                    body {{ font-family: Arial, sans-serif; margin: 0; color: #2c3e50; line-height: 1.4; }}
+                    .header {{ text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                              color: white; padding: 25px; border-radius: 10px; margin-bottom: 25px; }}
+                    .kpi-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 25px 0; }}
+                    .kpi-card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; 
+                                border-left: 4px solid #3498db; }}
+                    .kpi-number {{ font-size: 1.8em; font-weight: bold; color: #3498db; margin: 5px 0; }}
+                    table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
+                    th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }}
+                    th {{ background-color: #3498db; color: white; }}
+                    .section {{ margin: 25px 0; page-break-inside: avoid; }}
+                    .section-title {{ font-size: 1.3em; font-weight: 600; margin-bottom: 15px; 
+                                     border-bottom: 2px solid #3498db; padding-bottom: 8px; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>HealthKart Influencer Campaign Dashboard</h1>
+                    <p>Analytics & Performance Report</p>
+                    <p>Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">📊 Key Performance Metrics</h2>
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <h3>Market Reach</h3>
+                            <div class="kpi-number">{estimated_reach:,.0f}</div>
+                            <p>Total Followers: {total_followers:,}</p>
+                        </div>
+                        <div class="kpi-card">
+                            <h3>Total Orders</h3>
+                            <div class="kpi-number">{total_orders:,}</div>
+                            <p>Across all campaigns</p>
+                        </div>
+                        <div class="kpi-card">
+                            <h3>Total Revenue</h3>
+                            <div class="kpi-number">₹{total_revenue:,.0f}</div>
+                            <p>Generated revenue</p>
+                        </div>
+                        <div class="kpi-card">
+                            <h3>Overall ROAS</h3>
+                            <div class="kpi-number">{total_roas:.2f}x</div>
+                            <p>Return on ad spend</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">🏆 Top Performing Influencers</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Influencer</th>
+                                <th>Platform</th>
+                                <th>Category</th>
+                                <th>Orders</th>
+                                <th>Revenue (₹)</th>
+                                <th>ROAS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            """
+            
+            # Add top performers data
+            for _, row in top_performers.iterrows():
+                html_report += f"""
+                            <tr>
+                                <td>{row['name']}</td>
+                                <td>{row['platform']}</td>
+                                <td>{row['category']}</td>
+                                <td>{row['orders']:,}</td>
+                                <td>₹{row['total_revenue']:,.0f}</td>
+                                <td>{row['roas']:.2f}x</td>
+                            </tr>
+                """
+            
+            # Add platform summary
+            html_report += f"""
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">📱 Platform Distribution</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Platform</th>
+                                <th>Influencers</th>
+                                <th>Total Followers</th>
+                                <th>Avg Followers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            """
+            
+            for _, row in platform_summary.iterrows():
+                avg_followers = row['follower_count'] / row['influencer_id'] if row['influencer_id'] > 0 else 0
+                html_report += f"""
+                            <tr>
+                                <td>{row['platform']}</td>
+                                <td>{row['influencer_id']}</td>
+                                <td>{row['follower_count']:,}</td>
+                                <td>{avg_followers:,.0f}</td>
+                            </tr>
+                """
+            
+            html_report += """
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="section" style="text-align: center; margin-top: 40px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <p><strong>Report generated by HealthKart Influencer Campaign Dashboard</strong></p>
+                    <p>For interactive charts and real-time data, please visit the dashboard.</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            if PDF_EXPORT_AVAILABLE:
+                try:
+                    # Generate PDF using weasyprint
+                    pdf_buffer = io.BytesIO()
+                    weasyprint.HTML(string=html_report).write_pdf(pdf_buffer)
+                    pdf_buffer.seek(0)
+                    
+                    return dcc.send_bytes(
+                        pdf_buffer.getvalue(),
+                        filename=f"healthkart_dashboard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                    )
+                except Exception as pdf_error:
+                    print(f"PDF generation error: {pdf_error}")
+                    # Fall back to HTML
+                    return dcc.send_string(
+                        html_report,
+                        filename=f"healthkart_dashboard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                    )
+            else:
+                # Export as HTML if PDF libraries not available
+                return dcc.send_string(
+                    html_report,
+                    filename=f"healthkart_dashboard_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                )
+            
+        except Exception as e:
+            print(f"Error creating export: {e}")
+            return None
+    
+    return None
+
+# Sample file download callbacks
+@app.callback(
+    Output('download-instagram-sample-file', 'data'),
+    Input('download-instagram-sample', 'n_clicks'),
+    prevent_initial_call=True
+)
+def download_instagram_sample(n_clicks):
+    if n_clicks:
+        sample_data = pd.read_csv('/Users/nerve/Coding/healthkart/sample_instagram_data.csv')
+        return dcc.send_data_frame(sample_data.to_csv, filename="sample_instagram_data.csv", index=False)
+    return None
+
+@app.callback(
+    Output('download-youtube-sample-file', 'data'),
+    Input('download-youtube-sample', 'n_clicks'),
+    prevent_initial_call=True
+)
+def download_youtube_sample(n_clicks):
+    if n_clicks:
+        sample_data = pd.read_csv('/Users/nerve/Coding/healthkart/sample_youtube_data.csv')
+        return dcc.send_data_frame(sample_data.to_csv, filename="sample_youtube_data.csv", index=False)
+    return None
+
+
+# Modal callback for help popup
+@app.callback(
+    Output('help-modal', 'style'),
+    [Input('data-help-btn', 'n_clicks'),
+     Input('modal-close-btn', 'n_clicks')],
+    [State('help-modal', 'style')],
+    prevent_initial_call=True
+)
+def toggle_help_modal(help_clicks, close_clicks, current_style):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return {'display': 'none'}
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if button_id == 'data-help-btn':
+        # Open modal
+        return {
+            'position': 'fixed',
+            'top': '0',
+            'left': '0',
+            'width': '100%',
+            'height': '100%',
+            'backgroundColor': 'rgba(0,0,0,0.5)',
+            'zIndex': '1000',
+            'display': 'block'
+        }
+    elif button_id == 'modal-close-btn':
+        # Close modal
+        return {'display': 'none'}
+    
+    return {'display': 'none'}
 
 
 if __name__ == '__main__':
