@@ -2314,20 +2314,91 @@ def export_csv_data(n_clicks):
 def export_pdf_report(n_clicks):
     if n_clicks:
         try:
-            # Generate simplified HTML report with charts for PDF conversion
+            # Generate charts as base64 images for PDF inclusion
             
-            # Get key metrics
-            merged_df = pd.merge(payout_df, influencer_df, on='influencer_id')
-            merged_df['roas'] = merged_df['total_revenue'] / merged_df['total_cost']
-            top_performers = merged_df.nlargest(5, 'roas')
+            # 1. Brand Performance Chart
+            try:
+                brand_df = pd.read_csv('data/brand_performance.csv')
+                brand_df.columns = ['Brand', 'Campaigns', 'Reach', 'Revenue', 'Cost', 'ROAS']
+            except:
+                posts_df_temp = pd.read_csv('data/posts.csv')
+                brand_performance = posts_df_temp.groupby('brand_mentioned').agg({
+                    'post_id': 'count',
+                    'reach': 'sum'
+                }).reset_index()
+                brand_performance['revenue'] = brand_performance['reach'] * 0.05
+                brand_performance['cost'] = brand_performance['post_id'] * 50000
+                brand_performance['roas'] = brand_performance['revenue'] / brand_performance['cost']
+                brand_performance.columns = ['Brand', 'Campaigns', 'Reach', 'Revenue', 'Cost', 'ROAS']
+                brand_df = brand_performance.sort_values('Revenue', ascending=False)
             
-            # Platform summary
-            platform_summary = influencer_df.groupby('platform').agg({
+            brand_fig = go.Figure()
+            brand_fig.add_trace(go.Bar(
+                x=brand_df['Brand'],
+                y=brand_df['Revenue'],
+                marker_color=['#3498db', '#e74c3c', '#27ae60', '#f39c12'],
+                name='Revenue'
+            ))
+            brand_fig.update_layout(
+                title='Brand Performance - Revenue by Brand',
+                title_x=0.5,
+                height=300,
+                xaxis_title='Brand',
+                yaxis_title='Revenue (₹)',
+                template='plotly_white',
+                font=dict(size=10)
+            )
+            brand_chart_base64 = base64.b64encode(brand_fig.to_image(format="png", width=600, height=300)).decode()
+            
+            # 2. Platform Distribution Pie Chart
+            platform_stats = influencer_df.groupby('platform').agg({
                 'follower_count': 'sum',
                 'influencer_id': 'count'
             }).reset_index()
             
-            # Create HTML report suitable for PDF conversion
+            platform_fig = go.Figure(data=[go.Pie(
+                labels=platform_stats['platform'],
+                values=platform_stats['follower_count'],
+                hole=0.3
+            )])
+            platform_fig.update_layout(
+                title='Follower Distribution by Platform',
+                title_x=0.5,
+                height=300,
+                template='plotly_white',
+                font=dict(size=10)
+            )
+            platform_chart_base64 = base64.b64encode(platform_fig.to_image(format="png", width=600, height=300)).decode()
+            
+            # 3. ROAS Performance Chart
+            merged_df = pd.merge(payout_df, influencer_df, on='influencer_id')
+            merged_df['roas'] = merged_df['total_revenue'] / merged_df['total_cost']
+            top_performers = merged_df.nlargest(5, 'roas')
+            
+            roas_fig = go.Figure()
+            roas_fig.add_trace(go.Bar(
+                x=top_performers['name'],
+                y=top_performers['roas'],
+                marker_color='#27ae60',
+                name='ROAS'
+            ))
+            roas_fig.update_layout(
+                title='Top 5 Influencers by ROAS',
+                title_x=0.5,
+                height=300,
+                xaxis_title='Influencer',
+                yaxis_title='ROAS',
+                template='plotly_white',
+                font=dict(size=10),
+                xaxis_tickangle=-45
+            )
+            roas_chart_base64 = base64.b64encode(roas_fig.to_image(format="png", width=600, height=300)).decode()
+            
+            # Platform summary
+            platform_summary = platform_stats.copy()
+            platform_summary.columns = ['Platform', 'Total Followers', 'Influencer Count']
+            
+            # Create HTML report with embedded charts
             html_report = f"""
             <!DOCTYPE html>
             <html>
@@ -2343,6 +2414,8 @@ def export_pdf_report(n_clicks):
                     .kpi-card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; 
                                 border-left: 4px solid #3498db; }}
                     .kpi-number {{ font-size: 1.8em; font-weight: bold; color: #3498db; margin: 5px 0; }}
+                    .chart-container {{ text-align: center; margin: 20px 0; page-break-inside: avoid; }}
+                    .chart-image {{ max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; }}
                     table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
                     th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }}
                     th {{ background-color: #3498db; color: white; }}
@@ -2385,7 +2458,25 @@ def export_pdf_report(n_clicks):
                 </div>
                 
                 <div class="section">
+                    <h2 class="section-title">📈 Brand Performance Analysis</h2>
+                    <div class="chart-container">
+                        <img src="data:image/png;base64,{brand_chart_base64}" class="chart-image" alt="Brand Performance Chart">
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">📱 Platform Distribution</h2>
+                    <div class="chart-container">
+                        <img src="data:image/png;base64,{platform_chart_base64}" class="chart-image" alt="Platform Distribution Chart">
+                    </div>
+                </div>
+                
+                <div class="section">
                     <h2 class="section-title">🏆 Top Performing Influencers</h2>
+                    <div class="chart-container">
+                        <img src="data:image/png;base64,{roas_chart_base64}" class="chart-image" alt="Top Performers ROAS Chart">
+                    </div>
+                    
                     <table>
                         <thead>
                             <tr>
@@ -2413,14 +2504,14 @@ def export_pdf_report(n_clicks):
                             </tr>
                 """
             
-            # Add platform summary
+            # Add platform summary table
             html_report += f"""
                         </tbody>
                     </table>
                 </div>
                 
                 <div class="section">
-                    <h2 class="section-title">📱 Platform Distribution</h2>
+                    <h2 class="section-title">📊 Platform Summary</h2>
                     <table>
                         <thead>
                             <tr>
@@ -2434,12 +2525,12 @@ def export_pdf_report(n_clicks):
             """
             
             for _, row in platform_summary.iterrows():
-                avg_followers = row['follower_count'] / row['influencer_id'] if row['influencer_id'] > 0 else 0
+                avg_followers = row['Total Followers'] / row['Influencer Count'] if row['Influencer Count'] > 0 else 0
                 html_report += f"""
                             <tr>
-                                <td>{row['platform']}</td>
-                                <td>{row['influencer_id']}</td>
-                                <td>{row['follower_count']:,}</td>
+                                <td>{row['Platform']}</td>
+                                <td>{row['Influencer Count']}</td>
+                                <td>{row['Total Followers']:,}</td>
                                 <td>{avg_followers:,.0f}</td>
                             </tr>
                 """
@@ -2451,7 +2542,7 @@ def export_pdf_report(n_clicks):
                 
                 <div class="section" style="text-align: center; margin-top: 40px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                     <p><strong>Report generated by HealthKart Influencer Campaign Dashboard</strong></p>
-                    <p>For interactive charts and real-time data, please visit the dashboard.</p>
+                    <p>This report includes interactive charts converted to static images for PDF format.</p>
                 </div>
             </body>
             </html>
