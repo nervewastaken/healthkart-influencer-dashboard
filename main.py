@@ -179,6 +179,9 @@ app.index_string = '''
             #export-csv-btn:hover {
                 background-color: #219a52 !important;
             }
+            #insights-summary-btn:hover {
+                background-color: #2980b9 !important;
+            }
             /* Modal Styles */
             .modal-close {
                 position: absolute;
@@ -277,8 +280,19 @@ app.layout = html.Div([
                    style={
                        'backgroundColor': '#27ae60', 'color': 'white', 'border': 'none',
                        'padding': '12px 20px', 'borderRadius': '8px', 'cursor': 'pointer',
-                       'fontSize': '1em', 'fontWeight': '600',
+                       'fontSize': '1em', 'fontWeight': '600', 'marginRight': '10px',
                        'boxShadow': '0 4px 15px rgba(39,174,96,0.3)',
+                       'transition': 'all 0.3s ease'
+                   }),
+                html.Button([
+                    html.I(className="fas fa-chart-line", style={'marginRight': '8px'}),
+                    "Insights Summary"
+                ], id='insights-summary-btn',
+                   style={
+                       'backgroundColor': '#3498db', 'color': 'white', 'border': 'none',
+                       'padding': '12px 20px', 'borderRadius': '8px', 'cursor': 'pointer',
+                       'fontSize': '1em', 'fontWeight': '600',
+                       'boxShadow': '0 4px 15px rgba(52,152,219,0.3)',
                        'transition': 'all 0.3s ease'
                    })
             ], style={'display': 'flex', 'alignItems': 'center'})
@@ -829,6 +843,7 @@ app.layout = html.Div([
     # Hidden download components
     dcc.Download(id="download-pdf"),
     dcc.Download(id="download-csv-data"),
+    dcc.Download(id="download-insights-summary"),
     dcc.Download(id="download-instagram-sample-file"),
     dcc.Download(id="download-youtube-sample-file")
 
@@ -2575,6 +2590,25 @@ def export_pdf_report(n_clicks):
             
         except Exception as e:
             print(f"Error creating export: {e}")
+            return None
+    
+    return None
+
+# Callback for Insights Summary (download existing PDF)
+@app.callback(
+    Output('download-insights-summary', 'data'),
+    Input('insights-summary-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def export_insights_summary(n_clicks):
+    if n_clicks:
+        try:
+            # Download the existing healthkart.pdf file
+            return dcc.send_file("healthkart.pdf")
+            return dcc.send_file("healthkart.pdf")
+            
+        except Exception as e:
+            print(f"Error downloading insights summary: {e}")
             return None
     
     return None
