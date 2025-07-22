@@ -25,6 +25,9 @@ app = dash.Dash(__name__, external_stylesheets=[
 ])
 app.title = "HealthKart Influencer Campaign Dashboard"
 
+# Expose the server for Heroku deployment
+server = app.server
+
 # Custom CSS styling
 app.index_string = '''
 <!DOCTYPE html>
@@ -2672,4 +2675,4 @@ def toggle_help_modal(help_clicks, close_clicks, current_style):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=8050)
+    app.run_server(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8050)))

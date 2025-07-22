@@ -5,3 +5,5 @@ numpy==1.24.3
 gunicorn==21.2.0
 weasyprint==61.2
 kaleido==0.2.1
+Flask==2.3.3
+Werkzeug==2.3.7
