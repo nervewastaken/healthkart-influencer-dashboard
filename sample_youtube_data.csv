@@ -1,4 +1,4 @@
-do influencer_id,impressions_ctr_percentage,audience_retention_percentage,subscribers_gained,watch_time_hours
+influencer_id,impressions_ctr_percentage,audience_retention_percentage,subscribers_gained,watch_time_hours
 HK002,18.5,62.3,450,1250.5
 HK003,22.1,68.7,820,1850.2
 HK005,19.8,55.4,380,890.7
